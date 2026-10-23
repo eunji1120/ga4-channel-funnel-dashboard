@@ -43,11 +43,11 @@ preparing for a client call** who needs to answer two questions in under a minut
 
 | Component | Purpose |
 | --- | --- |
-| KPI scorecards | Sessions (360,974), Purchases (4,851), Revenue ($362,165), Conversion Rate (1.34%) |
-| Daily trend (dual axis) | Sessions vs purchases over time |
-| Revenue by channel | Bar chart sorted high to low |
-| Funnel steps by device | Viewed item, Added to cart, Checkouts, Purchases for desktop / mobile / tablet |
-| Filters | Date range and channel (medium) |
+| KPI scorecards | Sessions (360,974), Purchase sessions (4,851), Revenue ($362,165), Conversion Rate (1.34%) |
+| Daily trend (dual axis) | Sessions vs purchase sessions over time |
+| Revenue by first-user channel | Bar chart sorted high to low (see attribution note below) |
+| Funnel steps by device | Viewed item, Added to cart, Checkouts, Purchase sessions for desktop / mobile / tablet |
+| Filters | Date range and first-user channel (medium) |
 | Daily QA check | Added-to-cart vs checkouts by day, to catch tracking problems |
 
 ## Design choices
@@ -60,6 +60,9 @@ preparing for a client call** who needs to answer two questions in under a minut
 - **Self-serve filters.** Date and channel controls let readers answer follow-up questions
   without a new request.
 - **Data quality is visible.** Known data issues are noted on the page itself (see below).
+- **Honest attribution labels.** In the GA4 BigQuery export, `traffic_source.medium` is the channel that
+  *first acquired the user*, not the channel of each session. The chart and filter are therefore labelled
+  "First-user channel". For a client report, the attribution view should be agreed with the account team first.
 
 ## Data quality finding
 
@@ -67,6 +70,21 @@ While checking the funnel against the source data, I found that **add-to-cart ev
 missing or near zero on Nov 1-15 and Nov 20-24, 2020, while checkouts continue normally**.
 Since a checkout normally follows an add-to-cart, this points to a tracking gap in the
 source data rather than real customer behaviour.
+
+**Source check.** To rule out an error in my own view, I re-counted the events directly in the raw GA4
+export with [`sql/qa_raw_event_check.sql`](sql/qa_raw_event_check.sql) (no view in between):
+
+| Date (2020) | add_to_cart events | begin_checkout events |
+| --- | ---: | ---: |
+| Nov 1 | 4 | 127 |
+| Nov 2–15 | 0 every day | 132–605 per day |
+| Nov 16 | 85 | 542 |
+| Nov 17 | 535 | 693 |
+| Nov 20 | 15 | 318 |
+| Nov 21–24 | 0 every day | 166–366 per day |
+| Nov 26 | 1,047 | 321 |
+
+The gap is present in the source itself, so it is not caused by the view's logic.
 
 I did not patch or estimate the missing values. Instead, the dashboard:
 
@@ -85,7 +103,8 @@ with the affected dates and the query that shows the gap.
 .
 ├── README.md
 ├── sql/
-│   └── daily_channel_funnel.sql   # BigQuery view feeding the dashboard
+│   ├── daily_channel_funnel.sql   # BigQuery view feeding the dashboard
+│   └── qa_raw_event_check.sql     # source check on the raw GA4 export
 └── screenshots/
     ├── dashboard_overview.png
     └── qa_check_tracking_gap.png
