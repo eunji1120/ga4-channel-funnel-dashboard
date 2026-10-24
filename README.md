@@ -2,13 +2,16 @@
 
 A marketing performance dashboard built on Google's public GA4 e-commerce sample data
 (Google Merchandise Store, Nov 2020 to Jan 2021). Raw GA4 events are modelled in a
-BigQuery SQL view, then reported in Looker Studio with KPI scorecards, a channel
-breakdown, a funnel by device, and a daily QA check.
+BigQuery SQL views, then reported in Looker Studio with KPI scorecards, a 7-day trend,
+a channel table, funnel step rates by device, an automated daily QA check, and a notes page
+with KPI definitions, known issues and a change log.
 
 **Live dashboard (public, no sign-in needed):**
 <https://datastudio.google.com/reporting/cd440243-4dd2-4a16-b026-54507dded7ab>
 
 ![Dashboard overview](screenshots/dashboard_overview.png)
+
+*Screenshot is from v1; v2 changes are listed in the [change log](#change-log).*
 
 ---
 
@@ -26,9 +29,9 @@ preparing for a client call** who needs to answer two questions in under a minut
 | --- | --- |
 | Source | `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` (raw GA4 event export) |
 | Date range | 2020-11-01 to 2021-01-31 |
-| Model | BigQuery view [`sql/daily_channel_funnel.sql`](sql/daily_channel_funnel.sql) |
-| Grain | One row per date x channel (medium, source) x device |
-| Report | Looker Studio, connected directly to the view |
+| Model | BigQuery views [`daily_channel_funnel`](sql/daily_channel_funnel.sql), [`daily_trend`](sql/daily_trend.sql), [`qa_daily_flags`](sql/qa_daily_flags.sql) |
+| Grain | `daily_channel_funnel`: date x channel (medium, source) x device; `daily_trend`: date x channel x device (dense grid); `qa_daily_flags`: date |
+| Report | Looker Studio, connected directly to the views |
 
 **How the view works**
 
@@ -38,17 +41,36 @@ preparing for a client call** who needs to answer two questions in under a minut
   `event_params`.
 - The outer query counts distinct sessions overall and at each funnel step
   (`view_item`, `add_to_cart`, `begin_checkout`, `purchase`), and sums purchase revenue.
+- A `CASE` maps raw mediums to business-friendly channel names (e.g. `(none)` becomes
+  "Direct (none)"), so the naming convention lives in the model, not in each chart.
+
+**`daily_trend` (window functions)**
+
+- Builds a dense calendar x channel x device grid, so `ROWS BETWEEN 6 PRECEDING AND CURRENT ROW`
+  always means exactly 7 calendar days, even for segments with no sessions on some days.
+- Stores 7-day rolling **sums** (`SUM(...) OVER w7`) rather than averages. Looker re-aggregates
+  them, so the 7-day average (`SUM(sessions_7d) / MAX(days_in_window)`) and 7-day conversion
+  rate (`SUM(purchase_sessions_7d) / SUM(sessions_7d)`) stay correct under any channel or
+  device filter.
+- Checked: total sessions match the base view (360,974), and the rolling sum for Jan 31 equals
+  the hand-summed Jan 25-31 total (26,408).
+
+**`qa_daily_flags` (automated QA rule)**
+
+- Flags a day when add-to-cart sessions are lower than checkout sessions, since a checkout
+  normally follows an add-to-cart.
 
 ## Dashboard components
 
 | Component | Purpose |
 | --- | --- |
 | KPI scorecards | Sessions (360,974), Purchase sessions (4,851), Revenue ($362,165), Conversion Rate (1.34%) |
-| Daily trend (dual axis) | Sessions vs purchase sessions over time |
-| Revenue by first-user channel | Bar chart sorted high to low (see attribution note below) |
-| Funnel steps by device | Viewed item, Added to cart, Checkouts, Purchase sessions for desktop / mobile / tablet |
-| Filters | Date range and first-user channel (medium) |
-| Daily QA check | Added-to-cart vs checkouts by day, to catch funnel steps that don't add up |
+| Daily sessions with 7-day average | Daily sessions (light grey) with the 7-day average (bold blue) on one axis |
+| Channel performance table | Revenue (bars), conversion rate (heatmap) and sessions per first-user channel |
+| Funnel step conversion by device | Session to view, view to cart, cart to checkout, checkout to purchase and overall conversion rate, **using clean tracking days only (Nov 26 - Jan 31)** |
+| Filters | Date range and channel; the channel filter also applies to the trend chart |
+| Daily QA check | Added-to-cart vs checkouts by day; days that break the QA rule are highlighted red |
+| Notes & definitions page | KPI definitions, data sources, known issues and change log |
 
 ## Design choices
 
@@ -59,6 +81,12 @@ preparing for a client call** who needs to answer two questions in under a minut
   "Added to cart") and revenue is formatted as full USD figures instead of compact numbers.
 - **Self-serve filters.** Date and channel controls let readers answer follow-up questions
   without a new request.
+- **No dual axis.** The first version plotted sessions and purchases on two axes, which invites
+  false comparisons. The trend now shows one measure with its 7-day average on a single axis.
+- **Rates, not raw counts, for the funnel.** Counts made tablet invisible next to desktop;
+  step rates make devices comparable.
+- **Don't chart data you know is broken.** The funnel only uses days that pass the QA rule
+  (see below), and the chart title says so.
 - **Data quality is visible.** Known data issues are noted on the page itself (see below).
 - **Honest attribution labels.** In the GA4 BigQuery export, `traffic_source.medium` is the channel that
   *first acquired the user*, not the channel of each session. The chart and filter are therefore labelled
@@ -90,9 +118,19 @@ The gap is present in the raw export itself, so it is not caused by the view's l
 
 I did not patch or estimate the missing values. Instead, the dashboard:
 
-- includes a **Daily QA check** table that makes the gap easy to see, and
-- carries a **data quality note** explaining that the "Added to cart" step is understated
-  for those 20 days.
+- runs an automated QA rule (`qa_daily_flags`) and highlights failing days in red in the
+  **Daily QA check** table,
+- calculates funnel step rates from clean days only (Nov 26 - Jan 31), and
+- carries a **data quality note** on the page and on the Notes page.
+
+**From eyeballing to a rule.** I first spotted 20 days by eye (Nov 1-15, Nov 20-24). The rule
+flags **23 of 92 days** (Nov 1-16 and Nov 19-25): it also catches partial days such as Nov 16
+(34 add-to-cart vs 163 checkout sessions), Nov 19 (39 vs 126) and Nov 25 (78 vs 227). From
+Nov 26 onward add-to-cart sessions are consistently above checkouts.
+
+**Why it matters.** Over all 92 days, desktop cart-to-checkout comes out at 73% (6,402 / 8,818).
+On clean days only it is 51% (4,306 / 8,474). Using the full range would have overstated that
+step by about 22 points.
 
 In a production setting, I would compare against the GA4 interface, then escalate to the team
 that owns conversion tracking with the affected dates, the query that shows the gap and a
@@ -106,7 +144,9 @@ screenshot, and let the account team know which conclusions the data can and can
 .
 ├── README.md
 ├── sql/
-│   ├── daily_channel_funnel.sql   # BigQuery view feeding the dashboard
+│   ├── daily_channel_funnel.sql   # base view: sessions and funnel steps by date x channel x device
+│   ├── daily_trend.sql            # 7-day rolling sums (window functions)
+│   ├── qa_daily_flags.sql         # automated QA rule: add-to-cart < checkout
 │   └── qa_raw_event_check.sql     # source check on the raw GA4 export
 └── screenshots/
     ├── dashboard_overview.png
@@ -116,9 +156,20 @@ screenshot, and let the account team know which conclusions the data can and can
 ## Reproduce
 
 1. Open the BigQuery console (the free sandbox works) and create a dataset.
-2. Run [`sql/daily_channel_funnel.sql`](sql/daily_channel_funnel.sql), replacing the
-   project and dataset name with your own.
-3. In Looker Studio, add a BigQuery data source pointing at the view and build the charts.
+2. Run [`sql/daily_channel_funnel.sql`](sql/daily_channel_funnel.sql), then
+   [`sql/daily_trend.sql`](sql/daily_trend.sql) and [`sql/qa_daily_flags.sql`](sql/qa_daily_flags.sql),
+   replacing the project and dataset name with your own.
+3. In Looker Studio, add a BigQuery data source for each view and build the charts.
+4. Note: in the BigQuery sandbox, tables and views expire 60 days after creation. Re-run the
+   `CREATE OR REPLACE VIEW` statements before then, or move to the free tier.
+
+## Change log
+
+| Date | Change |
+| --- | --- |
+| 2026-10-22 | v1 published: KPI cards, dual-axis trend, channel bar chart, funnel counts by device, QA table |
+| 2026-10-23 | Business-friendly field names; add-to-cart gap confirmed in the raw export |
+| 2026-10-23 | v2: channel names in the model; `daily_trend` (window functions) with a 7-day average on one axis; `qa_daily_flags` rule with red rows; channel performance table; funnel step rates on clean days only; channel filter applied across data sources; Notes & definitions page |
 
 ---
 
