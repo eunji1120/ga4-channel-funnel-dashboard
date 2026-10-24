@@ -48,7 +48,7 @@ preparing for a client call** who needs to answer two questions in under a minut
 | Revenue by first-user channel | Bar chart sorted high to low (see attribution note below) |
 | Funnel steps by device | Viewed item, Added to cart, Checkouts, Purchase sessions for desktop / mobile / tablet |
 | Filters | Date range and first-user channel (medium) |
-| Daily QA check | Added-to-cart vs checkouts by day, to catch tracking problems |
+| Daily QA check | Added-to-cart vs checkouts by day, to catch funnel steps that don't add up |
 
 ## Design choices
 
@@ -68,8 +68,10 @@ preparing for a client call** who needs to answer two questions in under a minut
 
 While checking the funnel against the source data, I found that **add-to-cart events are
 missing or near zero on Nov 1-15 and Nov 20-24, 2020, while checkouts continue normally**.
-Since a checkout normally follows an add-to-cart, this points to a tracking gap in the
-source data rather than real customer behaviour.
+Since a checkout normally follows an add-to-cart, this is unlikely to be real customer behaviour.
+It could be a tracking gap, or a limitation of the sample itself: Google notes that this public
+GA4 dataset is obfuscated and that its internal consistency may be limited. From the data alone,
+the root cause can't be confirmed, so I treat it as an unresolved anomaly.
 
 **Source check.** To rule out an error in my own view, I re-counted the events directly in the raw GA4
 export with [`sql/qa_raw_event_check.sql`](sql/qa_raw_event_check.sql) (no view in between):
@@ -84,7 +86,7 @@ export with [`sql/qa_raw_event_check.sql`](sql/qa_raw_event_check.sql) (no view 
 | Nov 21–24 | 0 every day | 166–366 per day |
 | Nov 26 | 1,047 | 321 |
 
-The gap is present in the source itself, so it is not caused by the view's logic.
+The gap is present in the raw export itself, so it is not caused by the view's logic.
 
 I did not patch or estimate the missing values. Instead, the dashboard:
 
@@ -92,8 +94,9 @@ I did not patch or estimate the missing values. Instead, the dashboard:
 - carries a **data quality note** explaining that the "Added to cart" step is understated
   for those 20 days.
 
-In a production setting, I would escalate this to the team that owns conversion tracking,
-with the affected dates and the query that shows the gap.
+In a production setting, I would compare against the GA4 interface, then escalate to the team
+that owns conversion tracking with the affected dates, the query that shows the gap and a
+screenshot, and let the account team know which conclusions the data can and can't support.
 
 ![Daily QA check](screenshots/qa_check_tracking_gap.png)
 
