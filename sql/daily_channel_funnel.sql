@@ -10,6 +10,16 @@ WITH events AS (
     PARSE_DATE('%Y%m%d', event_date) AS event_date,
     traffic_source.medium AS medium,
     traffic_source.source AS source,
+    -- Business-friendly channel name (naming convention lives in the model, not the report)
+    CASE traffic_source.medium
+      WHEN 'organic'        THEN 'Organic search'
+      WHEN 'cpc'            THEN 'Paid search (cpc)'
+      WHEN 'referral'       THEN 'Referral'
+      WHEN '(none)'         THEN 'Direct (none)'
+      WHEN '(data deleted)' THEN 'Data deleted (sample)'
+      WHEN '<Other>'        THEN 'Other (grouped in sample)'
+      ELSE traffic_source.medium
+    END AS channel,
     device.category AS device,
     -- A GA4 session = user_pseudo_id + ga_session_id
     CONCAT(
@@ -25,6 +35,7 @@ SELECT
   event_date,
   medium,
   source,
+  channel,
   device,
   COUNT(DISTINCT session_id) AS sessions,
   COUNT(DISTINCT IF(event_name = 'view_item',      session_id, NULL)) AS view_item_sessions,
@@ -33,4 +44,4 @@ SELECT
   COUNT(DISTINCT IF(event_name = 'purchase',       session_id, NULL)) AS purchase_sessions,
   SUM(IF(event_name = 'purchase', revenue, 0)) AS revenue_usd
 FROM events
-GROUP BY event_date, medium, source, device;
+GROUP BY event_date, medium, source, channel, device;
