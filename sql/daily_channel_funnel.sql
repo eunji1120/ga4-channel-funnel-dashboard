@@ -2,9 +2,15 @@
 -- Turns raw GA4 events into one row per date x channel (medium/source) x device,
 -- with session counts at each funnel step and purchase revenue.
 -- Source: bigquery-public-data.ga4_obfuscated_sample_ecommerce (Nov 2020 - Jan 2021)
--- Feeds the Looker Studio dashboard.
+--
+-- Step 1 materialises the model as a table: the sample never changes, so scanning the
+-- ~1 GB raw export once is enough. Step 2 keeps the reporting view name that Looker Studio
+-- and the other views use, so nothing downstream has to be reconnected.
+-- Known limit: sessions are counted per day, so the 845 sessions (0.23%) that cross
+-- midnight are counted on both days; conversion rate moves by 0.002 points.
 
-CREATE OR REPLACE VIEW `profound-hydra-512219-h0.ga4_demo.daily_channel_funnel` AS
+-- Step 1: model table
+CREATE OR REPLACE TABLE `profound-hydra-512219-h0.ga4_demo.daily_channel_funnel_tbl` AS
 WITH events AS (
   SELECT
     PARSE_DATE('%Y%m%d', event_date) AS event_date,
@@ -45,3 +51,7 @@ SELECT
   SUM(IF(event_name = 'purchase', revenue, 0)) AS revenue_usd
 FROM events
 GROUP BY event_date, medium, source, channel, device;
+
+-- Step 2: reporting view used by Looker Studio, daily_trend and qa_daily_flags
+CREATE OR REPLACE VIEW `profound-hydra-512219-h0.ga4_demo.daily_channel_funnel` AS
+SELECT * FROM `profound-hydra-512219-h0.ga4_demo.daily_channel_funnel_tbl`;
