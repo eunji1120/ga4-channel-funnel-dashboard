@@ -179,7 +179,8 @@ screenshot, and let the account team know which conclusions the data can and can
 
 | Date | Change |
 | --- | --- |
-| 2026-10-22 | v1 published: KPI cards, dual-axis trend, channel bar chart, funnel counts by device, QA table |
+| 2026-10-20 | v1 built in Looker Studio and linked in my job application: KPI cards, dual-axis trend, channel bar chart, funnel counts by device, QA table |
+| 2026-10-22 | Repository published: README, BigQuery view SQL and screenshots |
 | 2026-10-23 | Business-friendly field names; add-to-cart gap confirmed in the raw export |
 | 2026-10-23 | v2: channel names in the model; `daily_trend` (window functions) with a 7-day average on one axis; `qa_daily_flags` rule with red rows; channel performance table; funnel step rates on clean days only; channel filter applied across data sources; Notes & definitions page |
 | 2026-10-25 | v3: base model materialised as a table, so queries no longer rescan about 1 GB of raw events; cross-midnight session check documented; "First-user channel" used in every label; QA columns named as session counts; alert rewritten to separate confirmed facts from the unconfirmed cause; view-to-purchase rate added to the funnel; data status line; page renamed Executive Overview; [release checklist](docs/release_checklist.md) |
