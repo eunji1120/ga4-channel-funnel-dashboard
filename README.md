@@ -11,7 +11,7 @@ with KPI definitions, known issues and a change log.
 
 ![Dashboard overview](screenshots/dashboard_overview.png)
 
-*Screenshot is from v1; v2 changes are listed in the [change log](#change-log).*
+*Screenshot is from v1; later changes are listed in the [change log](#change-log).*
 
 ---
 
@@ -29,9 +29,9 @@ preparing for a client call** who needs to answer two questions in under a minut
 | --- | --- |
 | Source | `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` (raw GA4 event export) |
 | Date range | 2020-11-01 to 2021-01-31 |
-| Model | BigQuery views [`daily_channel_funnel`](sql/daily_channel_funnel.sql), [`daily_trend`](sql/daily_trend.sql), [`qa_daily_flags`](sql/qa_daily_flags.sql) |
+| Model | Table `daily_channel_funnel_tbl` built once from the raw export, exposed through the view `daily_channel_funnel` ([SQL](sql/daily_channel_funnel.sql)); views [`daily_trend`](sql/daily_trend.sql) and [`qa_daily_flags`](sql/qa_daily_flags.sql) read from it |
 | Grain | `daily_channel_funnel`: date x channel (medium, source) x device; `daily_trend`: date x channel x device (dense grid); `qa_daily_flags`: date |
-| Report | Looker Studio, connected directly to the views |
+| Report | Looker Studio, connected to the three views |
 
 **How the view works**
 
@@ -43,6 +43,15 @@ preparing for a client call** who needs to answer two questions in under a minut
   (`view_item`, `add_to_cart`, `begin_checkout`, `purchase`), and sums purchase revenue.
 - A `CASE` maps raw mediums to business-friendly channel names (e.g. `(none)` becomes
   "Direct (none)"), so the naming convention lives in the model, not in each chart.
+- The result is stored as a table, because the sample never changes. Before this, every chart
+  query rescanned about 1 GB of raw events and the 7-day trend took around 30 seconds to load.
+  The view keeps its name, so Looker Studio did not need to be reconnected.
+
+**Session counting check.** Sessions are counted per day, so a session that crosses midnight
+is counted on both days. Counting distinct sessions over the whole range gives 360,129 instead of
+360,974: 845 sessions (0.23%), none spanning more than two days. Purchase sessions: 4,848 vs 4,851.
+Conversion rate changes by 0.002 percentage points (1.346% vs 1.344%). This is below my 0.5%
+threshold for changing the model, so it is documented as a known limit instead.
 
 **`daily_trend` (window functions)**
 
@@ -67,9 +76,10 @@ preparing for a client call** who needs to answer two questions in under a minut
 | KPI scorecards | Sessions (360,974), Purchase sessions (4,851), Revenue ($362,165), Conversion Rate (1.34%) |
 | Daily sessions with 7-day average | Daily sessions (light grey) with the 7-day average (bold blue) on one axis |
 | Channel performance table | Revenue (bars), conversion rate (heatmap) and sessions per first-user channel |
-| Funnel step conversion by device | Session to view, view to cart, cart to checkout, checkout to purchase and overall conversion rate, **using clean tracking days only (Nov 26 - Jan 31)** |
-| Filters | Date range and channel; the channel filter also applies to the trend chart |
-| Daily QA check | Added-to-cart vs checkouts by day; days that break the QA rule are highlighted red |
+| Funnel step conversion by device | Session to view, view to cart, cart to checkout, checkout to purchase, overall conversion rate and view to purchase rate, **using clean tracking days only (Nov 26 - Jan 31)** |
+| Filters | Date range and first-user channel; the channel filter also applies to the trend chart |
+| Daily QA check | Sessions with add-to-cart vs sessions with checkout by day; days that break the QA rule are highlighted red. The alert under it separates what is confirmed (the pattern, also in the raw export) from what is not (the cause) |
+| Data status line | Source, period, refresh status, attribution model and funnel window, under the title |
 | Notes & definitions page | KPI definitions, data sources, known issues and change log |
 
 ## Design choices
@@ -144,10 +154,12 @@ screenshot, and let the account team know which conclusions the data can and can
 .
 ├── README.md
 ├── sql/
-│   ├── daily_channel_funnel.sql   # base view: sessions and funnel steps by date x channel x device
+│   ├── daily_channel_funnel.sql   # model table + reporting view: sessions and funnel steps by date x channel x device
 │   ├── daily_trend.sql            # 7-day rolling sums (window functions)
 │   ├── qa_daily_flags.sql         # automated QA rule: add-to-cart < checkout
 │   └── qa_raw_event_check.sql     # source check on the raw GA4 export
+├── docs/
+│   └── release_checklist.md       # checks to run before sharing the report
 └── screenshots/
     ├── dashboard_overview.png
     └── qa_check_tracking_gap.png
@@ -161,7 +173,7 @@ screenshot, and let the account team know which conclusions the data can and can
    replacing the project and dataset name with your own.
 3. In Looker Studio, add a BigQuery data source for each view and build the charts.
 4. Note: in the BigQuery sandbox, tables and views expire 60 days after creation. Re-run the
-   `CREATE OR REPLACE VIEW` statements before then, or move to the free tier.
+   SQL files before then, or move to the free tier.
 
 ## Change log
 
@@ -170,6 +182,7 @@ screenshot, and let the account team know which conclusions the data can and can
 | 2026-10-22 | v1 published: KPI cards, dual-axis trend, channel bar chart, funnel counts by device, QA table |
 | 2026-10-23 | Business-friendly field names; add-to-cart gap confirmed in the raw export |
 | 2026-10-23 | v2: channel names in the model; `daily_trend` (window functions) with a 7-day average on one axis; `qa_daily_flags` rule with red rows; channel performance table; funnel step rates on clean days only; channel filter applied across data sources; Notes & definitions page |
+| 2026-10-25 | v3: base model materialised as a table (trend loads in seconds instead of ~30 s); cross-midnight session check documented; "First-user channel" used in every label; QA columns named as session counts; alert rewritten to separate confirmed facts from the unconfirmed cause; view-to-purchase rate added to the funnel; data status line; page renamed Executive Overview; [release checklist](docs/release_checklist.md) |
 
 ---
 
