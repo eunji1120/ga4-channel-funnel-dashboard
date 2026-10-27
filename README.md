@@ -2,7 +2,7 @@
 
 A marketing performance dashboard built on Google's public GA4 e-commerce sample data
 (Google Merchandise Store, Nov 2020 to Jan 2021). Raw GA4 events are modelled in a
-BigQuery SQL views, then reported in Looker Studio with KPI scorecards, a 7-day trend,
+BigQuery table and SQL views, then reported in Looker Studio with KPI scorecards, a 7-day trend,
 a channel table, funnel step rates by device, an automated daily QA check, and a notes page
 with KPI definitions, known issues and a change log.
 
@@ -78,7 +78,7 @@ threshold for changing the model, so it is documented as a known limit instead.
 | Channel performance table | Revenue (bars), conversion rate (heatmap) and sessions per first-user channel |
 | Funnel step conversion by device | Session to view, view to cart, cart to checkout, checkout to purchase, overall conversion rate and view to purchase rate, **using clean tracking days only (Nov 26 - Jan 31)** |
 | Filters | Date range and first-user channel; the channel filter also applies to the trend chart |
-| Daily QA check | Sessions with add-to-cart vs sessions with checkout by day; days that break the QA rule are highlighted red. The alert under it separates what is confirmed (the pattern, also in the raw export) from what is not (the cause) |
+| Dates requiring review | The 23 days that break the QA rule, newest first, with sessions with add-to-cart vs sessions with checkout. The alert under it gives the count and says the funnel uses Nov 26 onward only |
 | Data status line | Source, period, refresh status, attribution model and funnel window, under the title |
 | Notes & definitions page | KPI definitions, data sources, known issues and change log |
 
@@ -95,8 +95,8 @@ threshold for changing the model, so it is documented as a known limit instead.
   false comparisons. The trend now shows one measure with its 7-day average on a single axis.
 - **Rates, not raw counts, for the funnel.** Counts made tablet invisible next to desktop;
   step rates make devices comparable.
-- **Don't chart data you know is broken.** The funnel only uses days that pass the QA rule
-  (see below), and the chart title says so.
+- **Don't chart data you know is broken.** The funnel only uses Nov 26 - Jan 31, the period after
+  the last day that fails the QA rule (see below), and the status line and QA alert say so.
 - **Data quality is visible.** Known data issues are noted on the page itself (see below).
 - **Honest attribution labels.** In the GA4 BigQuery export, `traffic_source.medium` is the channel that
   *first acquired the user*, not the channel of each session. The chart and filter are therefore labelled
@@ -128,8 +128,8 @@ The gap is present in the raw export itself, so it is not caused by the view's l
 
 I did not patch or estimate the missing values. Instead, the dashboard:
 
-- runs an automated QA rule (`qa_daily_flags`) and highlights failing days in red in the
-  **Daily QA check** table,
+- runs an automated QA rule (`qa_daily_flags`) and lists the failing days in the
+  **Dates requiring review** table,
 - calculates funnel step rates from clean days only (Nov 26 - Jan 31), and
 - carries a **data quality note** on the page and on the Notes page.
 
