@@ -73,7 +73,7 @@ threshold for changing the model, so it is documented as a known limit instead.
 
 | Component | Purpose |
 | --- | --- |
-| KPI scorecards | Sessions (360,974), Purchase sessions (4,851), Revenue ($362,165), Conversion Rate (1.34%) |
+| KPI scorecards | Sessions (360,974), Purchase sessions (4,851), Revenue ($362,165), Conversion rate (1.34%) |
 | Daily sessions with 7-day average | Daily sessions (light grey) with the 7-day average (bold blue) on one axis |
 | Channel performance table | Revenue (bars), conversion rate (heatmap) and sessions per first-user channel |
 | Funnel step conversion by device | Session to view, view to cart, cart to checkout, checkout to purchase, overall conversion rate and view to purchase rate, **using clean tracking days only (Nov 26 - Jan 31)** |
