@@ -3,8 +3,8 @@
 A marketing performance dashboard built on Google's public GA4 e-commerce sample data
 (Google Merchandise Store, Nov 2020 to Jan 2021). Raw GA4 events are modelled in a
 BigQuery table and SQL views, then reported in Looker Studio with KPI scorecards, a 7-day trend,
-a channel table, funnel step rates by device, an automated daily QA check, and a notes page
-with KPI definitions, known issues and a change log.
+a channel table, funnel step rates by device, an automated daily QA check, and a Method, QA &
+Definitions page with the audience, data pipeline, KPI definitions, known issues and a change log.
 
 **Live dashboard (public, no sign-in needed):**
 <https://datastudio.google.com/reporting/cd440243-4dd2-4a16-b026-54507dded7ab>
@@ -18,9 +18,9 @@ with KPI definitions, known issues and a change log.
 ## Audience and questions
 
 This is a self-directed portfolio project. I designed it for an **account manager
-preparing for a client call** who needs to answer two questions in under a minute:
+preparing for a client performance call** who needs to answer two questions in under a minute:
 
-1. Which channels and devices bring sessions and revenue?
+1. Which first-user channels and devices drive sessions and revenue?
 2. Where does the purchase funnel drop off?
 
 ## Data and pipeline
@@ -73,14 +73,19 @@ threshold for changing the model, so it is documented as a known limit instead.
 
 | Component | Purpose |
 | --- | --- |
+| Audience and decision lines | Under the title: a self-directed portfolio project designed for an account manager, not commissioned by a real client, and the two questions the page answers |
 | KPI scorecards | Sessions (360,974), Purchase sessions (4,851), Revenue ($362,165), Conversion rate (1.34%) |
+| Default-view takeaway | One line under the KPIs, for the default view only: Organic search leads revenue; Referral has the highest CVR among non-sample channels |
+| Next step | One line under the takeaway: investigate the referral sources and landing pages behind the higher conversion rate, validate tracking quality, and check whether the pattern repeats |
 | Daily sessions with 7-day average | Daily sessions (light grey) with the 7-day average (bold blue) on one axis |
-| Channel performance table | Revenue (bars), conversion rate (heatmap) and sessions per first-user channel |
+| First-user channel performance table | Revenue (bars), conversion rate (heatmap), sessions and purchase sessions per first-user channel |
 | Funnel step conversion by device | Session to view, view to cart, cart to checkout, checkout to purchase, overall conversion rate and view to purchase rate, **using clean tracking days only (Nov 26 - Jan 31)** |
-| Filters | Date range and first-user channel; the channel filter also applies to the trend chart |
-| Dates requiring review | The 23 days that break the QA rule, newest first, with sessions with add-to-cart vs sessions with checkout. The alert under it gives the count and says the funnel uses Nov 26 onward only |
-| Data status line | Source, period, refresh status, attribution model and funnel window, under the title |
-| Notes & definitions page | KPI definitions, data sources, known issues and change log |
+| Filters | Date range and first-user channel controls, or click a channel row; the channel filter also applies to the trend chart |
+| QA alert | Full-width line under the next step, above the charts: the count of flagged days in the raw GA4 export, the root cause is not confirmed, funnel step rates use Nov 26 onward only, and no missing events were estimated or patched |
+| Dates requiring review | The 23 days that break the QA rule, newest first, with sessions with add-to-cart vs sessions with checkout. A note under it says the check is global and not affected by the first-user channel filter |
+| Data status lines | Two lines under the title: source (public GA4 export → BigQuery model → Looker Studio), then static sample, period, first-user attribution and funnel window |
+| Viewer-time note | Last line of the page: the "Data Last Updated" time below it is added by Looker Studio and is not the date of the source data, which is a static Nov 1, 2020 to Jan 31, 2021 sample (the footer itself cannot be turned off) |
+| Method, QA & Definitions page | Audience and decision, data pipeline, KPI definitions, design decisions, QA and limitations, and the change log |
 
 ## Design choices
 
@@ -96,11 +101,14 @@ threshold for changing the model, so it is documented as a known limit instead.
 - **Rates, not raw counts, for the funnel.** Counts made tablet invisible next to desktop;
   step rates make devices comparable.
 - **Don't chart data you know is broken.** The funnel only uses Nov 26 - Jan 31, the period after
-  the last day that fails the QA rule (see below), and the status line and QA alert say so.
+  the last day that fails the QA rule (see below), and the status lines, the note beside the funnel table and the QA alert say so.
 - **Data quality is visible.** Known data issues are noted on the page itself (see below).
 - **Honest attribution labels.** In the GA4 BigQuery export, `traffic_source.medium` is the channel that
   *first acquired the user*, not the channel of each session. The chart and filter are therefore labelled
   "First-user channel". For a client report, the attribution view should be agreed with the account team first.
+- **Transferable method, no extra connectors.** The same approach (one modelled table, one definition per
+  metric, an automated QA rule) could be applied to lead-gen, Google Ads, LinkedIn or CRM data. This
+  dashboard is not connected to any of those sources; it uses only the public GA4 sample.
 
 ## Data quality finding
 
@@ -131,7 +139,7 @@ I did not patch or estimate the missing values. Instead, the dashboard:
 - runs an automated QA rule (`qa_daily_flags`) and lists the failing days in the
   **Dates requiring review** table,
 - calculates funnel step rates from clean days only (Nov 26 - Jan 31), and
-- carries a **data quality note** on the page and on the Notes page.
+- carries a **data quality note** on the overview page and on the Method, QA & Definitions page.
 
 **From eyeballing to a rule.** I first spotted 20 days by eye (Nov 1-15, Nov 20-24). The rule
 flags **23 of 92 days** (Nov 1-16 and Nov 19-25): it also catches partial days such as Nov 16
@@ -184,6 +192,9 @@ screenshot, and let the account team know which conclusions the data can and can
 | 2026-10-23 | Business-friendly field names; add-to-cart gap confirmed in the raw export |
 | 2026-10-23 | v2: channel names in the model; `daily_trend` (window functions) with a 7-day average on one axis; `qa_daily_flags` rule with red rows; channel performance table; funnel step rates on clean days only; channel filter applied across data sources; Notes & definitions page |
 | 2026-10-25 | v3: base model materialised as a table, so queries no longer rescan about 1 GB of raw events; cross-midnight session check documented; "First-user channel" used in every label; QA columns named as session counts; alert rewritten to separate confirmed facts from the unconfirmed cause; view-to-purchase rate added to the funnel; data status line; page renamed Executive Overview; [release checklist](docs/release_checklist.md) |
+| 2026-10-27 | v4: audience and decision lines under the title; data status split into two lines; default-view takeaway; notes beside the channel and funnel tables; QA alert moved beside the funnel table and now says the root cause is not confirmed; trend date axis shortened so the last label is not cut off; second page rebuilt as Method, QA & Definitions; page navigation moved to top tabs |
+| 2026-10-27 | v4.1: note explaining the "Data Last Updated" footer; QA alert moved above the funnel and QA tables so it is visible without scrolling; trend and channel charts shortened to make room; helper text raised from 12 to 13 px and the two interaction hints split by purpose; change log on the dashboard reformatted as version · date · change |
+| 2026-10-28 | v4.2: next step line added and QA alert moved above the charts; QA alert names the raw GA4 export and says no missing events were estimated or patched; footer note reworded to say the "Data Last Updated" time is added by Looker Studio and is not the date of the source data; channel table renamed "First-user channel performance", with a "Conversion rate" header and a Purchase sessions column; "self-directed" and "not commissioned by a real client" added to page 1; empty space under the charts removed |
 
 ---
 
